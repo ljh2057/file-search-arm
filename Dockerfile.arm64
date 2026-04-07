@@ -1,5 +1,5 @@
 # ARM64 专用 Dockerfile（aarch64）
-# 修复：LibreOffice 改用 apt 安装，解决 aarch64 包不存在的问题
+# 修复：创建 kkfileview 所需的配置文件目录和默认配置
 
 FROM ubuntu:20.04
 
@@ -21,7 +21,7 @@ RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && 
     apt-get install -y fontconfig ttf-wqy-microhei ttf-wqy-zenhei xfonts-wqy wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
-# 安装 JDK 11（使用 Eclipse Temurin，官方提供 aarch64 二进制）
+# 安装 JDK 11（Eclipse Temurin aarch64）
 RUN cd /tmp && \
     wget --no-check-certificate \
       "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.23%2B9/OpenJDK11U-jdk_aarch64_linux_hotspot_11.0.23_9.tar.gz" \
@@ -30,7 +30,7 @@ RUN cd /tmp && \
     mv jdk-11.0.23+9 /usr/local/jdk-11 && \
     rm -rf /tmp/*
 
-# 安装 LibreOffice（使用 apt，兼容 aarch64，Ubuntu 20.04 自带 6.4.x）
+# 安装 LibreOffice（apt 方式，aarch64 完整支持）
 RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     apt-get update && \
@@ -47,6 +47,33 @@ RUN cd /usr/share/fonts/chinese && \
     mkfontscale && \
     mkfontdir && \
     fc-cache -fv
+
+# -------------------------------------------------------
+# 修复：创建 kkfileview 期望的配置文件目录和默认配置
+# kkfileview 硬编码从 /server/src/main/config/application.properties 读取配置
+# -------------------------------------------------------
+RUN mkdir -p /server/src/main/config
+
+RUN cat > /server/src/main/config/application.properties << 'EOF'
+# kkfileview 默认配置
+server.port=8012
+server.servlet.context-path=/
+
+# 文件预览缓存目录（与 KK_FILE_DIR 环境变量保持一致）
+file.dir=/fsearch/cache/
+
+# LibreOffice 安装路径（apt 安装后的默认路径）
+office.home=/usr/lib/libreoffice
+
+# 只转换前5页，避免大文件性能问题
+office.pagerange=1-5
+
+# 允许预览的最大文件大小（MB）
+pdf.download.disable=false
+
+# 水印配置（默认关闭）
+base.url=default
+EOF
 
 # 创建应用目录
 RUN mkdir -p /fsearch/{cache,files,data}
