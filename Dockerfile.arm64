@@ -1,5 +1,6 @@
 # ARM64 专用 Dockerfile（aarch64）
-# 基础镜像
+# 修复：LibreOffice 改用 apt 安装，解决 aarch64 包不存在的问题
+
 FROM ubuntu:20.04
 
 LABEL maintainer="ayound@48098911.qq.com"
@@ -7,7 +8,7 @@ LABEL maintainer="ayound@48098911.qq.com"
 # 复制中文字体文件
 COPY fonts/* /usr/share/fonts/chinese/
 
-# 配置系统环境
+# 配置系统环境 + 安装基础工具
 RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     apt-get clean && \
@@ -20,27 +21,26 @@ RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && 
     apt-get install -y fontconfig ttf-wqy-microhei ttf-wqy-zenhei xfonts-wqy wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
-# 安装 JDK 11 (aarch64 版本)
-# 使用 Eclipse Temurin（原 AdoptOpenJDK），官方提供 ARM64 二进制
+# 安装 JDK 11（使用 Eclipse Temurin，官方提供 aarch64 二进制）
 RUN cd /tmp && \
     wget --no-check-certificate \
-      https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.23%2B9/OpenJDK11U-jdk_aarch64_linux_hotspot_11.0.23_9.tar.gz \
+      "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.23%2B9/OpenJDK11U-jdk_aarch64_linux_hotspot_11.0.23_9.tar.gz" \
       -O jdk-11-aarch64.tar.gz && \
     tar -zxf jdk-11-aarch64.tar.gz && \
     mv jdk-11.0.23+9 /usr/local/jdk-11 && \
     rm -rf /tmp/*
 
-# 安装 LibreOffice 7.6.5（aarch64 版本）
-RUN apt-get update && \
-    apt-get install -y libxrender1 libxinerama1 libxt6 libxext-dev \
+# 安装 LibreOffice（使用 apt，兼容 aarch64，Ubuntu 20.04 自带 6.4.x）
+RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      libreoffice \
+      libreoffice-l10n-zh-cn \
+      libreoffice-help-zh-cn \
+      libxrender1 libxinerama1 libxt6 libxext-dev \
       libfreetype6-dev libcairo2 libcups2 libx11-xcb1 libnss3 && \
-    cd /tmp && \
-    wget --no-check-certificate \
-      https://downloadarchive.documentfoundation.org/libreoffice/old/7.6.5.1/deb/aarch64/LibreOffice_7.6.5.1_Linux_aarch64_deb.tar.gz && \
-    tar -zxf LibreOffice_7.6.5.1_Linux_aarch64_deb.tar.gz && \
-    cd LibreOffice_7.6.5.1_Linux_aarch64_deb/DEBS && \
-    dpkg -i *.deb && \
-    rm -rf /tmp/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # 配置字体缓存
 RUN cd /usr/share/fonts/chinese && \
@@ -54,17 +54,16 @@ RUN mkdir -p /fsearch/{cache,files,data}
 # 复制 JAR 包
 COPY target/file-search-1.0.6-SNAPSHOT.jar /fsearch/
 
-ENV USER_NAME admin
-ENV PASSWORD 123456
-ENV KK_BASE_URL default
-ENV JAVA_HOME /usr/local/jdk-11
-ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
-ENV PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$JAVA_HOME/bin
-ENV LANG zh_CN.UTF-8
-ENV LC_ALL zh_CN.UTF-8
-ENV KK_FILE_DIR /fsearch/cache
-ENV SCAN_FILE_PATHS /fsearch/files
-ENV DATA_FILE_PATHS /fsearch/data
+ENV USER_NAME=admin
+ENV PASSWORD=123456
+ENV KK_BASE_URL=default
+ENV JAVA_HOME=/usr/local/jdk-11
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/jdk-11/bin
+ENV LANG=zh_CN.UTF-8
+ENV LC_ALL=zh_CN.UTF-8
+ENV KK_FILE_DIR=/fsearch/cache
+ENV SCAN_FILE_PATHS=/fsearch/files
+ENV DATA_FILE_PATHS=/fsearch/data
 
 VOLUME /fsearch/files
 VOLUME /fsearch/data
